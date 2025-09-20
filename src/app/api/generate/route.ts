@@ -142,7 +142,10 @@ Requirements:
       throw new Error('No image generated from DALL-E');
     }
 
-    const imageUrl = dalleResponse.data[0]?.url ?? null;
+    // ✅ 关键改动：先兜底到局部变量，TS 不再提示 possibly undefined
+    const data = (dalleResponse.data ?? []) as Array<{ url?: string | null; b64_json?: string | null }>;
+    const imageUrl = data[0]?.url ?? null;
+
     if (!imageUrl) {
       throw new Error('No image URL returned');
     }

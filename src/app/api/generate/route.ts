@@ -111,7 +111,7 @@ Be very specific about the person's appearance. Use simple, clear English.`
 
     try {
       dalleResponse = await openai.images.generate({
-        model: 'dall-e-3', // 可选：更未来兼容的是 'gpt-image-1'
+        model: 'dall-e-3', // 可改 'gpt-image-1'
         prompt: `Create a single Studio Ghibli style portrait of ONE person based on this description: ${cleanDescription}. 
         
 Requirements:
@@ -127,9 +127,8 @@ Requirements:
       });
     } catch (error) {
       console.log('DALL-E 3 failed, trying with simplified prompt...', error);
-      // 如果原始提示词失败，使用更简单的提示词
       dalleResponse = await openai.images.generate({
-        model: 'dall-e-3', // 可选：更未来兼容的是 'gpt-image-1'
+        model: 'dall-e-3', // 可改 'gpt-image-1'
         prompt: 'A single Studio Ghibli style portrait of one person with soft pastel colors, gentle lighting, and clean background. Family-friendly art style.',
         size: '1024x1024',
         quality: 'standard',
@@ -137,15 +136,16 @@ Requirements:
       });
     }
 
-    // 2) 显式存在性 + 数组校验（让 TS 完全收窄）
-    if (!dalleResponse || !Array.isArray(dalleResponse.data) || dalleResponse.data.length === 0) {
+    // 2) 收窄 + 兜底，避免 TS 报 possibly undefined
+    if (!dalleResponse) {
+      throw new Error('No image response from DALL-E');
+    }
+    const data = Array.isArray(dalleResponse.data) ? dalleResponse.data : []; // ✅ 关键一行
+    if (data.length === 0) {
       throw new Error('No image generated from DALL-E');
     }
 
-    // ✅ 关键改动：先兜底到局部变量，TS 不再提示 possibly undefined
-    const data = (dalleResponse.data ?? []) as Array<{ url?: string | null; b64_json?: string | null }>;
-    const imageUrl = data[0]?.url ?? null;
-
+    const imageUrl = data[0]?.url ?? null; // ✅ 关键一行
     if (!imageUrl) {
       throw new Error('No image URL returned');
     }
@@ -155,11 +155,11 @@ Requirements:
       imageUrl,
       originalDescription: imageDescription 
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('OpenAI generation error:', error);
     return NextResponse.json({ 
       error: 'Generation failed', 
-      details: error.message 
+      details: error?.message ?? String(error) 
     }, { status: 500 });
   }
 }

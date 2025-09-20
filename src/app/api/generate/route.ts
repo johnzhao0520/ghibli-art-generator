@@ -132,9 +132,13 @@ Requirements:
       });
     }
 
-    const imageUrl = dalleResponse?.data?.[0]?.url;
+    if (!dalleResponse || !dalleResponse.data || dalleResponse.data.length === 0) {
+      throw new Error('No image generated from DALL-E');
+    }
+    
+    const imageUrl = dalleResponse.data[0]?.url;
     if (!imageUrl) {
-      throw new Error('No image generated');
+      throw new Error('No image URL returned');
     }
 
     console.log('Ghibli-style image generated successfully:', imageUrl);

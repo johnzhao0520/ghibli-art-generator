@@ -136,16 +136,8 @@ Requirements:
       });
     }
 
-    // 2) 收窄 + 兜底，避免 TS 报 possibly undefined
-    if (!dalleResponse) {
-      throw new Error('No image response from DALL-E');
-    }
-    const data = Array.isArray(dalleResponse.data) ? dalleResponse.data : []; // ✅ 关键一行
-    if (data.length === 0) {
-      throw new Error('No image generated from DALL-E');
-    }
-
-    const imageUrl = data[0]?.url ?? null; // ✅ 关键一行
+    // 2) 最小安全取值写法（可选链解决 TS 问题）
+    const imageUrl = dalleResponse?.data?.[0]?.url ?? null;
     if (!imageUrl) {
       throw new Error('No image URL returned');
     }

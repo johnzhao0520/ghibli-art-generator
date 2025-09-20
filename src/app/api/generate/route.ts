@@ -14,28 +14,26 @@ export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   const formData = await request.formData();
   const file = formData.get('file') as File;
-  
+
   if (!file) {
     return NextResponse.json({ error: 'No file provided' }, { status: 400 });
   }
 
-  // 检查权限
+  // 权限与试用逻辑
   const isLoggedIn = !!session;
-  const cookieStore = cookies();
+  const cookieStore = await cookies(); // ✅ 此处需要 await
   const hasActiveSub = cookieStore.get('subscription_active')?.value === 'true';
   const hasUsedTrial = cookieStore.get('trial_used')?.value === 'true';
+
+  // 是否在这次响应里标记试用
+  let shouldMarkTrialUsed = false;
 
   if (!isLoggedIn) {
     if (hasUsedTrial) {
       return NextResponse.json({ error: 'Trial used, please subscribe' }, { status: 402 });
     }
-    // 标记试用已使用
-    cookieStore.set('trial_used', 'true', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 365, // 1年
-    });
+    // 不再在这里 set；改为在成功响应上设置 cookie
+    shouldMarkTrialUsed = true;
   } else {
     if (!hasActiveSub) {
       return NextResponse.json({ error: 'Subscription required' }, { status: 402 });
@@ -43,24 +41,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    // 验证文件类型
+    // 文件校验
     if (!file.type.startsWith('image/')) {
       return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
     }
-
-    // 验证文件大小 (5MB 限制)
     if (file.size > 5 * 1024 * 1024) {
       return NextResponse.json({ error: 'File too large' }, { status: 400 });
     }
 
-    console.log('Analyzing uploaded image with GPT-4 Vision...');
-    
-    // 转换文件为 base64
+    // 转 base64
     const arrayBuffer = await file.arrayBuffer();
     const base64 = Buffer.from(arrayBuffer).toString('base64');
     const mimeType = file.type;
 
-    // 步骤1：使用 GPT-4 Vision 分析图片
+    // 1) 先用 gpt-4o 分析
     const visionResponse = await openai.chat.completions.create({
       model: 'gpt-4o',
       messages: [
@@ -76,18 +70,16 @@ export async function POST(request: Request) {
 4. Pose and body position
 5. Background setting
 
-Be very specific about the person's appearance. Use simple, clear English.`
+Be very specific about the person's appearance. Use simple, clear English.`,
             },
             {
               type: 'image_url',
-              image_url: {
-                url: `data:${mimeType};base64,${base64}`
-              }
-            }
-          ]
-        }
+              image_url: { url: `data:${mimeType};base64,${base64}` },
+            },
+          ],
+        },
       ],
-      max_tokens: 300
+      max_tokens: 300,
     });
 
     const imageDescription = visionResponse.choices[0]?.message?.content;
@@ -95,23 +87,17 @@ Be very specific about the person's appearance. Use simple, clear English.`
       throw new Error('Failed to analyze image');
     }
 
-    console.log('Image analysis completed:', imageDescription);
-
-    // 步骤2：使用 DALL-E 3 生成 Ghibli 风格图片
-    console.log('Generating Ghibli-style image with DALL-E 3...');
-    
-    // 清理和过滤描述，确保符合安全政策
+    // 2) 生成 Ghibli 风格图
     const cleanDescription = imageDescription
-      .replace(/[^\w\s.,!?-]/g, '') // 移除特殊字符
-      .substring(0, 200); // 限制长度
-    
-    // 1) 类型声明更稳妥 - 使用返回值推断
+      .replace(/[^\w\s.,!?-]/g, '')
+      .substring(0, 200);
+
     type ImgRes = Awaited<ReturnType<typeof openai.images.generate>>;
     let dalleResponse: ImgRes | null = null;
 
     try {
       dalleResponse = await openai.images.generate({
-        model: 'dall-e-3', // 可改 'gpt-image-1'
+        model: 'dall-e-3', // 可换成 'gpt-image-1'
         prompt: `Create a single Studio Ghibli style portrait of ONE person based on this description: ${cleanDescription}. 
         
 Requirements:
@@ -128,35 +114,42 @@ Requirements:
     } catch (error) {
       console.log('DALL-E 3 failed, trying with simplified prompt...', error);
       dalleResponse = await openai.images.generate({
-        model: 'dall-e-3', // 可改 'gpt-image-1'
-        prompt: 'A single Studio Ghibli style portrait of one person with soft pastel colors, gentle lighting, and clean background. Family-friendly art style.',
+        model: 'dall-e-3',
+        prompt:
+          'A single Studio Ghibli style portrait of one person with soft pastel colors, gentle lighting, and clean background. Family-friendly art style.',
         size: '1024x1024',
         quality: 'standard',
         n: 1,
       });
     }
 
-    // 2) 最小安全取值写法（可选链解决 TS 问题）
-    const imageUrl = dalleResponse?.data?.[0]?.url ?? null;
+    // 安全取值（避免 TS 可空性）
+    const imageUrl = (dalleResponse as any)?.data?.[0]?.url ?? null;
     if (!imageUrl) {
       throw new Error('No image URL returned');
     }
 
-    console.log('Ghibli-style image generated successfully:', imageUrl);
-    return NextResponse.json({ 
-      imageUrl,
-      originalDescription: imageDescription 
-    });
-  } catch (error: unknown) {
-    const message =
-      typeof error === 'object' && error !== null && 'message' in error
-        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          String((error as any).message)
-        : String(error);
+    // 构造响应，并在这里设置试用 Cookie（如需要）
+    const res = NextResponse.json(
+      { imageUrl, originalDescription: imageDescription },
+      { status: 200 }
+    );
+
+    if (shouldMarkTrialUsed) {
+      res.cookies.set('trial_used', 'true', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365, // 1年
+      });
+    }
+
+    return res;
+  } catch (error: any) {
     console.error('OpenAI generation error:', error);
-    return NextResponse.json({ 
-      error: 'Generation failed', 
-      details: message 
-    }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Generation failed', details: error?.message ?? String(error) },
+      { status: 500 }
+    );
   }
 }

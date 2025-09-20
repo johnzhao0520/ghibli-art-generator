@@ -132,7 +132,7 @@ Requirements:
       });
     }
 
-    const imageUrl = dalleResponse.data[0]?.url;
+    const imageUrl = dalleResponse?.data?.[0]?.url;
     if (!imageUrl) {
       throw new Error('No image generated');
     }

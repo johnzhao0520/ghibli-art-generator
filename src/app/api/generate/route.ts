@@ -120,8 +120,8 @@ Requirements:
         quality: 'standard',
         n: 1,
       });
-    } catch (dalleError) {
-      console.log('DALL-E 3 failed, trying with simplified prompt...');
+    } catch (error) {
+      console.log('DALL-E 3 failed, trying with simplified prompt...', error);
       // 如果原始提示词失败，使用更简单的提示词
       dalleResponse = await openai.images.generate({
         model: 'dall-e-3',

@@ -15,6 +15,6 @@ export async function GET() {
     trialUsed,
     email: session?.user?.email || null,
     name: session?.user?.name || null,
-    image: (session as any)?.user?.image || null,
+    image: session?.user?.image || null,
   });
 }

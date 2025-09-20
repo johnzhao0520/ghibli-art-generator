@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { PrimaryButton, OutlineButton } from '@/components/ui/Button';
+import Link from 'next/link';
+import { PrimaryButton } from '@/components/ui/Button';
 
 function NavBar({ loggedIn, subscriptionActive, user }: { 
   loggedIn: boolean; 
@@ -11,12 +12,12 @@ function NavBar({ loggedIn, subscriptionActive, user }: {
   return (
     <header className="sticky top-0 z-10 bg-white/70 backdrop-blur border-b border-emerald-100">
       <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-2 group">
+        <Link href="/" className="flex items-center gap-2 group">
           <div className="h-8 w-8 rounded bg-emerald-500 shadow ring-2 ring-emerald-200" />
           <span className="text-slate-900 font-semibold tracking-wide group-hover:text-emerald-700 transition-colors">
             Ghibli-Inspired Art
           </span>
-        </a>
+        </Link>
         <nav className="flex items-center gap-2">
           <a href="/dashboard" className="text-sm px-3 py-2 rounded hover:bg-emerald-50 text-slate-700">
             Dashboard
@@ -180,7 +181,7 @@ export default function Page() {
       
       setGenerationStep('正在生成 Ghibli 风格图片...');
       
-      const { imageUrl, originalDescription } = await response.json();
+      const { imageUrl } = await response.json();
       setGeneratedUrl(imageUrl);
       
       // 更新试用状态

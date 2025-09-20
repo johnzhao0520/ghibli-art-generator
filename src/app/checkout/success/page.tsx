@@ -5,7 +5,7 @@ import { PrimaryButton } from '@/components/ui/Button';
 
 export default function CheckoutSuccessPage() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [debugInfo, setDebugInfo] = useState<{sessionId: string | null, url: string} | null>(null);
 
   useEffect(() => {
     const verifyPayment = async () => {

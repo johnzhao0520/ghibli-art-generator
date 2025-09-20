@@ -103,7 +103,9 @@ Be very specific about the person's appearance. Use simple, clear English.`
       .replace(/[^\w\s.,!?-]/g, '') // 移除特殊字符
       .substring(0, 200); // 限制长度
     
-    let dalleResponse;
+    // 1) 明确类型
+    let dalleResponse: OpenAI.ImagesResponse | null = null;
+
     try {
       dalleResponse = await openai.images.generate({
         model: 'dall-e-3',
@@ -132,11 +134,12 @@ Requirements:
       });
     }
 
-    if (!dalleResponse || !dalleResponse.data || dalleResponse.data.length === 0) {
+    // 2) 显式存在性 + 数组校验（让 TS 完全收窄）
+    if (!dalleResponse || !Array.isArray(dalleResponse.data) || dalleResponse.data.length === 0) {
       throw new Error('No image generated from DALL-E');
     }
-    
-    const imageUrl = dalleResponse.data[0]?.url;
+
+    const imageUrl = dalleResponse.data[0]?.url ?? null;
     if (!imageUrl) {
       throw new Error('No image URL returned');
     }

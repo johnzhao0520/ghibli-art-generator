@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/authOptions';
 import { cookies } from 'next/headers';
 import OpenAI from 'openai';
 
+export const runtime = 'nodejs';
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
@@ -19,7 +21,7 @@ export async function POST(request: Request) {
 
   // 检查权限
   const isLoggedIn = !!session;
-  const cookieStore = await cookies();
+  const cookieStore = cookies();
   const hasActiveSub = cookieStore.get('subscription_active')?.value === 'true';
   const hasUsedTrial = cookieStore.get('trial_used')?.value === 'true';
 
@@ -103,12 +105,13 @@ Be very specific about the person's appearance. Use simple, clear English.`
       .replace(/[^\w\s.,!?-]/g, '') // 移除特殊字符
       .substring(0, 200); // 限制长度
     
-    // 1) 明确类型
-    let dalleResponse: OpenAI.ImagesResponse | null = null;
+    // 1) 类型声明更稳妥 - 使用返回值推断
+    type ImgRes = Awaited<ReturnType<typeof openai.images.generate>>;
+    let dalleResponse: ImgRes | null = null;
 
     try {
       dalleResponse = await openai.images.generate({
-        model: 'dall-e-3',
+        model: 'dall-e-3', // 可选：更未来兼容的是 'gpt-image-1'
         prompt: `Create a single Studio Ghibli style portrait of ONE person based on this description: ${cleanDescription}. 
         
 Requirements:
@@ -126,7 +129,7 @@ Requirements:
       console.log('DALL-E 3 failed, trying with simplified prompt...', error);
       // 如果原始提示词失败，使用更简单的提示词
       dalleResponse = await openai.images.generate({
-        model: 'dall-e-3',
+        model: 'dall-e-3', // 可选：更未来兼容的是 'gpt-image-1'
         prompt: 'A single Studio Ghibli style portrait of one person with soft pastel colors, gentle lighting, and clean background. Family-friendly art style.',
         size: '1024x1024',
         quality: 'standard',

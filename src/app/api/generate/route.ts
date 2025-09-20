@@ -124,7 +124,8 @@ Requirements:
     }
 
     // 安全取值（避免 TS 可空性）
-    const imageUrl = (dalleResponse as any)?.data?.[0]?.url ?? null;
+    const data = (dalleResponse?.data ?? []) as Array<{ url?: string | null; b64_json?: string | null }>;
+    const imageUrl = data[0]?.url ?? null;
     if (!imageUrl) {
       throw new Error('No image URL returned');
     }
@@ -145,10 +146,14 @@ Requirements:
     }
 
     return res;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      typeof error === 'object' && error !== null && 'message' in error
+        ? String((error as { message?: unknown }).message)
+        : String(error);
     console.error('OpenAI generation error:', error);
     return NextResponse.json(
-      { error: 'Generation failed', details: error?.message ?? String(error) },
+      { error: 'Generation failed', details: message },
       { status: 500 }
     );
   }

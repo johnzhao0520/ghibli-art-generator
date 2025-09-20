@@ -194,7 +194,8 @@ export default function Page() {
     } catch (error) {
       console.error('Generation error:', error);
       // 重定向到错误页面
-      window.location.href = `/error?type=generation&message=${encodeURIComponent(error.message)}`;
+      const message = error instanceof Error ? error.message : String(error);
+      window.location.href = `/error?type=generation&message=${encodeURIComponent(message)}`;
     } finally {
       setIsGenerating(false);
     }

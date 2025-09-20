@@ -147,11 +147,16 @@ Requirements:
       imageUrl,
       originalDescription: imageDescription 
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message =
+      typeof error === 'object' && error !== null && 'message' in error
+        ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          String((error as any).message)
+        : String(error);
     console.error('OpenAI generation error:', error);
     return NextResponse.json({ 
       error: 'Generation failed', 
-      details: error?.message ?? String(error) 
+      details: message 
     }, { status: 500 });
   }
 }

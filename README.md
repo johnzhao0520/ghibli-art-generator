@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ghibli Art Generator MVP
 
-## Getting Started
+一个将用户照片转换为 Studio Ghibli 风格插画的 AI 图像生成器 MVP。
 
-First, run the development server:
+## 功能特性
+
+- 🎨 **AI 图像生成**: 使用 OpenAI GPT-4 Vision + DALL-E 3 将用户照片转换为 Ghibli 风格插画
+- 🔐 **Google 登录**: 集成 NextAuth.js 和 Google OAuth 2.0
+- 💳 **Stripe 支付**: 月度订阅模式，支持 Stripe Checkout
+- 👤 **用户面板**: 显示用户信息和订阅状态
+- 🆓 **试用系统**: 未登录用户可免费试用一次
+- 📱 **响应式设计**: 使用 TailwindCSS，支持移动端
+
+## 技术栈
+
+- **前端**: Next.js 15, React, TailwindCSS
+- **认证**: NextAuth.js, Google OAuth
+- **支付**: Stripe Checkout
+- **AI**: OpenAI GPT-4 Vision, DALL-E 3
+- **部署**: Vercel (推荐)
+
+## 环境变量
+
+创建 `.env.local` 文件：
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# OpenAI
+OPENAI_API_KEY=sk-...
+
+# NextAuth
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-secret-key
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# Stripe
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PRICE_ID=price_...
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 开发
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# 安装依赖
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# 启动开发服务器
+npm run dev
 
-## Learn More
+# 构建生产版本
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 部署
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. 将代码推送到 GitHub
+2. 在 Vercel 中导入项目
+3. 配置环境变量
+4. 部署
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 项目结构
 
-## Deploy on Vercel
+```
+src/
+├── app/
+│   ├── api/           # API 路由
+│   ├── checkout/      # 支付页面
+│   ├── dashboard/     # 用户面板
+│   ├── error/         # 错误页面
+│   ├── login/         # 登录页面
+│   └── page.tsx       # 首页
+├── components/        # React 组件
+└── lib/              # 工具函数
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 功能流程
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. 用户访问首页
+2. 上传图片
+3. 系统检查试用/订阅状态
+4. 使用 GPT-4 Vision 分析图片
+5. 使用 DALL-E 3 生成 Ghibli 风格图片
+6. 用户下载生成的图片
+
+## 注意事项
+
+- 确保 OpenAI API 有足够额度
+- Stripe 需要在测试模式下配置
+- 图片大小限制 5MB
+- 支持 JPG, PNG, WebP 格式

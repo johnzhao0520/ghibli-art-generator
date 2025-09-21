@@ -10,20 +10,23 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
-// 三种吉卜力风格的 Prompt 模板
-const stylePrompts = {
-  'ghibli-inspired': `A person in Studio Ghibli inspired style. Hand-drawn anime look, vibrant colors, whimsical atmosphere, detailed background, warm lighting, and expressive character design.`,
-  
-  'ghibli-soft-pastel': `A person in Studio Ghibli soft pastel style. Dreamlike atmosphere, gentle pastel colors, soft shading, warm glow, delicate hand-drawn lines, and tender expressions.`,
-  
-  'ghibli-filmic': `A person in Studio Ghibli cinematic film style. Cinematic composition, deep contrast, rich lighting, painterly textures, emotional tone, and dramatic atmosphere.`
+// 三种吉卜力风格的 Prompt 模板（强调保持人物特征与单人构图）
+const stylePrompts: Record<string, string> = {
+  'ghibli-inspired':
+    'Convert this photo into a Studio Ghibli inspired illustration. Keep the same person and key facial features (age, gender, hair, clothing). Hand-drawn anime look, vibrant colors, whimsical atmosphere, clean background, warm lighting, single person portrait centered.',
+  'ghibli-soft-pastel':
+    'Convert this photo into a Studio Ghibli soft pastel illustration. Keep the same person and key facial features (age, gender, hair, clothing). Dreamlike atmosphere, gentle pastel colors, soft shading, warm glow, delicate lines, clean background, single person portrait centered.',
+  'ghibli-filmic':
+    'Convert this photo into a Studio Ghibli cinematic film style illustration. Keep the same person and key facial features (age, gender, hair, clothing). Cinematic composition, rich lighting, painterly textures, emotional tone, clean background, single person portrait centered.',
 };
 
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   const formData = await request.formData();
-  const file = formData.get('file') as File;
-  const style = formData.get('style') as string || 'ghibli-inspired';
+  // 兼容字段名：优先使用 file，其次 image
+  const file = (formData.get('file') as File) || (formData.get('image') as File);
+  const style = (formData.get('style') as string) || 'ghibli-inspired';
+  const customPrompt = formData.get('prompt') ? String(formData.get('prompt')) : '';
 
   if (!file) {
     return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -57,30 +60,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'File too large' }, { status: 400 });
     }
 
-    // 获取对应风格的 prompt
-    const selectedPrompt = stylePrompts[style as keyof typeof stylePrompts] || stylePrompts['ghibli-inspired'];
+    // File -> Buffer（edits 支持 Buffer/Stream）
+    const arrayBuf = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuf);
 
-    // 使用 gpt-image-1 生成图片
-    const result = await openai.images.generate({
+    // 选择风格 prompt，允许自定义覆盖
+    const selectedPrompt = customPrompt || stylePrompts[style] || stylePrompts['ghibli-inspired'];
+
+    // 使用 gpt-image-1 的 images.edits，实现“带参考图风格化”并保持人物一致性
+    const result = await openai.images.edits({
       model: 'gpt-image-1',
+      image: buffer,
       prompt: selectedPrompt,
       size: '1024x1024',
       n: 1,
     });
 
-    const imageUrl = result.data[0]?.url;
+    // 取 URL 或回退到 base64
+    const imageUrl = result.data[0]?.url || (result.data[0]?.b64_json ? `data:image/png;base64,${result.data[0]?.b64_json}` : null);
     if (!imageUrl) {
-      throw new Error('No image URL returned');
+      throw new Error('No image returned');
     }
 
     // 构造响应
-    const res = NextResponse.json(
-      { 
-        imageUrl, 
-        style,
-      },
-      { status: 200 }
-    );
+    const res = NextResponse.json({ imageUrl, style }, { status: 200 });
 
     // 设置试用标记
     if (shouldMarkTrialUsed) {

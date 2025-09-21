@@ -43,8 +43,13 @@ function NavBar({ loggedIn, subscriptionActive, user }: {
 }
 
 function UploadZone({
-  file, onFileChange,
-}: { file: File | null; onFileChange: (f: File) => void; }) {
+  file, onFileChange, selectedStyle, onStyleChange
+}: { 
+  file: File | null; 
+  onFileChange: (f: File) => void;
+  selectedStyle: string;
+  onStyleChange: (style: string) => void;
+}) {
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [previewUrl, setPreviewUrl] = useState('');
@@ -65,40 +70,59 @@ function UploadZone({
   };
 
   return (
-    <div
-      role="region"
-      aria-label="图片上传区域，支持拖拽或点击选择"
-      className={`mt-6 w-full max-w-[600px] mx-auto p-5 rounded-lg border-2 border-dashed
-      ${dragOver ? 'border-emerald-500 bg-emerald-50/60' : 'border-emerald-200 bg-white'}
-      shadow transition-colors`}
-      onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-      onDragLeave={() => setDragOver(false)}
-    >
-      <div className="text-center space-y-3">
-        <div className="text-slate-600">
-          拖拽图片到此处，或
-          <button
-            aria-label="选择图片上传"
-            className="ml-1 text-emerald-700 underline decoration-emerald-300 hover:text-emerald-800"
-            onClick={() => inputRef.current?.click()}
-          >
-            点击上传
-          </button>
-        </div>
-        <div className="text-xs text-slate-500">支持 JPG/PNG，最大 10MB</div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png"
-          className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-        />
-        {previewUrl && (
-          <div className="mt-4">
-            <img src={previewUrl} alt="preview" className="mx-auto rounded shadow max-h-64 object-contain" />
+    <div className="space-y-4">
+      {/* 风格选择器 */}
+      <div className="w-full max-w-[600px] mx-auto space-y-2">
+        <label className="block text-sm font-medium text-slate-700">
+          Choose Ghibli Style:
+        </label>
+        <select 
+          value={selectedStyle}
+          onChange={(e) => onStyleChange(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-sm"
+        >
+          <option value="ghibli-inspired">🎨 Ghibli Inspired - Vibrant & Whimsical</option>
+          <option value="ghibli-soft-pastel">🌸 Ghibli Soft Pastel - Dreamy & Gentle</option>
+          <option value="ghibli-filmic">🎬 Ghibli Filmic - Cinematic & Dramatic</option>
+        </select>
+      </div>
+
+      {/* 现有的上传区域保持不变 */}
+      <div
+        role="region"
+        aria-label="图片上传区域，支持拖拽或点击选择"
+        className={`w-full max-w-[600px] mx-auto p-5 rounded-lg border-2 border-dashed
+        ${dragOver ? 'border-emerald-500 bg-emerald-50/60' : 'border-emerald-200 bg-white'}
+        shadow transition-colors`}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f); }}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+      >
+        <div className="text-center space-y-3">
+          <div className="text-slate-600">
+            拖拽图片到此处，或
+            <button
+              aria-label="选择图片上传"
+              className="ml-1 text-emerald-700 underline decoration-emerald-300 hover:text-emerald-800"
+              onClick={() => inputRef.current?.click()}
+            >
+              点击上传
+            </button>
           </div>
-        )}
+          <div className="text-xs text-slate-500">支持 JPG/PNG，最大 10MB</div>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
+          />
+          {previewUrl && (
+            <div className="mt-4">
+              <img src={previewUrl} alt="preview" className="mx-auto rounded shadow max-h-64 object-contain" />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -111,7 +135,7 @@ export default function Page() {
   const [trialUsed, setTrialUsed] = useState(false);
   const [user, setUser] = useState<{name: string, email: string, image: string} | null>(null);
 
-  const [style, setStyle] = useState('ghibli');
+  const [selectedStyle, setSelectedStyle] = useState('ghibli-inspired'); // 新增
   const [file, setFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState('');
@@ -153,47 +177,39 @@ export default function Page() {
     window.location.href = '/checkout';
   };
 
+  // 更新生成函数
   const simulateGenerate = async () => {
     if (!file) return;
     
     setIsGenerating(true);
-    setGenerationStep('正在分析图片...');
+    setGenerationStep('Uploading reference image...');
     
     try {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('style', selectedStyle); // 添加风格参数
+
+      setGenerationStep('Generating Ghibli style image...');
       
       const response = await fetch('/api/generate', {
         method: 'POST',
         body: formData,
       });
-      
+
       if (response.status === 402) {
-        // 需要订阅
-        onRequireLoginOrCheckout();
+        window.location.href = '/login';
         return;
       }
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Generation failed');
+
+      const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
       }
-      
-      setGenerationStep('正在生成 Ghibli 风格图片...');
-      
-      const { imageUrl } = await response.json();
-      setGeneratedUrl(imageUrl);
-      
-      // 更新试用状态
-      if (!loggedIn && !trialUsed) {
-        setTrialUsed(true);
-        localStorage.setItem('trial_used', 'true');
-      }
-      
+
+      setGeneratedUrl(data.imageUrl);
       setGenerationStep('');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Generation error:', error);
-      // 重定向到错误页面
       const message = error instanceof Error ? error.message : String(error);
       window.location.href = `/error?type=generation&message=${encodeURIComponent(message)}`;
     } finally {
@@ -202,10 +218,10 @@ export default function Page() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <NavBar loggedIn={loggedIn} subscriptionActive={subscriptionActive} user={user} />
-
-      <main className="max-w-3xl mx-auto px-4 py-10">
+      
+      <main className="max-w-3xl mx-auto px-4 py-12 space-y-8">
         <section className="text-center [background-image:radial-gradient(rgba(16,185,129,0.06)_1px,transparent_1px)] bg-[length:12px_12px] rounded-xl p-8">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900">
             将你的照片变为 Ghibli 风格插画
@@ -214,21 +230,12 @@ export default function Page() {
             一次免费体验。订阅后解锁更多生成次数。Ghibli-inspired，柔和、手绘、幻想的光影与细腻纹理。
           </p>
 
-          <div className="mt-6 w-full max-w-[600px] mx-auto">
-            <label className="block text-left text-sm text-slate-700 mb-2">风格（预留）：</label>
-            <select
-              aria-label="选择生成风格"
-              value={style}
-              onChange={(e) => setStyle(e.target.value)}
-              className="w-full rounded-md border border-emerald-200 bg-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-400"
-            >
-              <option value="ghibli">Ghibli Inspired</option>
-              <option value="ghibli-soft">Ghibli Soft Pastel</option>
-              <option value="ghibli-filmic">Ghibli Filmic</option>
-            </select>
-          </div>
-
-          <UploadZone file={file} onFileChange={setFile} />
+          <UploadZone 
+            file={file} 
+            onFileChange={setFile}
+            selectedStyle={selectedStyle}
+            onStyleChange={setSelectedStyle}
+          />
 
           <div className="mt-6 flex flex-col items-center gap-3">
             <PrimaryButton

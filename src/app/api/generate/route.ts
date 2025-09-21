@@ -10,10 +10,20 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
+// 三种吉卜力风格的 Prompt 模板
+const stylePrompts = {
+  'ghibli-inspired': `A person in Studio Ghibli inspired style. Hand-drawn anime look, vibrant colors, whimsical atmosphere, detailed background, warm lighting, and expressive character design.`,
+  
+  'ghibli-soft-pastel': `A person in Studio Ghibli soft pastel style. Dreamlike atmosphere, gentle pastel colors, soft shading, warm glow, delicate hand-drawn lines, and tender expressions.`,
+  
+  'ghibli-filmic': `A person in Studio Ghibli cinematic film style. Cinematic composition, deep contrast, rich lighting, painterly textures, emotional tone, and dramatic atmosphere.`
+};
+
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   const formData = await request.formData();
   const file = formData.get('file') as File;
+  const style = formData.get('style') as string || 'ghibli-inspired';
 
   if (!file) {
     return NextResponse.json({ error: 'No file provided' }, { status: 400 });
@@ -21,18 +31,16 @@ export async function POST(request: Request) {
 
   // 权限与试用逻辑
   const isLoggedIn = !!session;
-  const cookieStore = await cookies(); // ✅ 此处需要 await
+  const cookieStore = cookies();
   const hasActiveSub = cookieStore.get('subscription_active')?.value === 'true';
   const hasUsedTrial = cookieStore.get('trial_used')?.value === 'true';
 
-  // 是否在这次响应里标记试用
   let shouldMarkTrialUsed = false;
 
   if (!isLoggedIn) {
     if (hasUsedTrial) {
       return NextResponse.json({ error: 'Trial used, please subscribe' }, { status: 402 });
     }
-    // 不再在这里 set；改为在成功响应上设置 cookie
     shouldMarkTrialUsed = true;
   } else {
     if (!hasActiveSub) {
@@ -49,108 +57,60 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'File too large' }, { status: 400 });
     }
 
-    // 转 base64
-    const arrayBuffer = await file.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString('base64');
-    const mimeType = file.type;
-
-    // 1) 先用 gpt-4o 分析
-    const visionResponse = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Analyze this image carefully and describe ONLY the main person in detail. Focus on:
-1. Person's age, gender, facial features, expression
-2. Hair color and style
-3. Clothing and colors
-4. Pose and body position
-5. Background setting
-
-Be very specific about the person's appearance. Use simple, clear English.`,
-            },
-            {
-              type: 'image_url',
-              image_url: { url: `data:${mimeType};base64,${base64}` },
-            },
-          ],
-        },
-      ],
-      max_tokens: 300,
+    // 1) 上传参考图片到 OpenAI
+    const uploadedFile = await openai.files.create({
+      file: file,
+      purpose: 'vision',
     });
 
-    const imageDescription = visionResponse.choices[0]?.message?.content;
-    if (!imageDescription) {
-      throw new Error('Failed to analyze image');
-    }
+    console.log('Uploaded reference file:', uploadedFile.id);
 
-    // 2) 生成 Ghibli 风格图
-    const cleanDescription = imageDescription
-      .replace(/[^\w\s.,!?-]/g, '')
-      .substring(0, 200);
+    // 2) 获取对应风格的 prompt
+    const selectedPrompt = stylePrompts[style as keyof typeof stylePrompts] || stylePrompts['ghibli-inspired'];
 
-    type ImgRes = Awaited<ReturnType<typeof openai.images.generate>>;
-    let dalleResponse: ImgRes | null = null;
+    // 3) 使用 gpt-image-1 生成图片，引用上传的图片
+    const result = await openai.images.generate({
+      model: 'gpt-image-1',
+      prompt: selectedPrompt,
+      size: '1024x1024',
+      n: 1,
+      referenced_image_ids: [uploadedFile.id], // 关键：引用上传的图片保持人物一致性
+    });
 
-    try {
-      dalleResponse = await openai.images.generate({
-        model: 'dall-e-3', // 可换成 'gpt-image-1'
-        prompt: `Create a single Studio Ghibli style portrait of ONE person based on this description: ${cleanDescription}. 
-        
-Requirements:
-- Show only ONE person, not multiple people
-- Keep the person's key features: age, gender, hair, clothing
-- Studio Ghibli art style with soft pastel colors
-- Gentle lighting and clean background
-- Portrait format, centered composition
-- Family-friendly illustration`,
-        size: '1024x1024',
-        quality: 'standard',
-        n: 1,
-      });
-    } catch (error) {
-      console.log('DALL-E 3 failed, trying with simplified prompt...', error);
-      dalleResponse = await openai.images.generate({
-        model: 'dall-e-3',
-        prompt:
-          'A single Studio Ghibli style portrait of one person with soft pastel colors, gentle lighting, and clean background. Family-friendly art style.',
-        size: '1024x1024',
-        quality: 'standard',
-        n: 1,
-      });
-    }
-
-    // 安全取值（避免 TS 可空性）
-    const data = (dalleResponse?.data ?? []) as Array<{ url?: string | null; b64_json?: string | null }>;
-    const imageUrl = data[0]?.url ?? null;
+    const imageUrl = result.data[0]?.url;
     if (!imageUrl) {
       throw new Error('No image URL returned');
     }
 
-    // 构造响应，并在这里设置试用 Cookie（如需要）
+    // 构造响应
     const res = NextResponse.json(
-      { imageUrl, originalDescription: imageDescription },
+      { 
+        imageUrl, 
+        style,
+        referenceFileId: uploadedFile.id 
+      },
       { status: 200 }
     );
 
+    // 设置试用标记
     if (shouldMarkTrialUsed) {
       res.cookies.set('trial_used', 'true', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         maxAge: 60 * 60 * 24 * 365, // 1年
+        path: '/'
       });
     }
 
     return res;
+
   } catch (error: unknown) {
     const message =
       typeof error === 'object' && error !== null && 'message' in error
         ? String((error as { message?: unknown }).message)
         : String(error);
+    
     console.error('OpenAI generation error:', error);
     return NextResponse.json(
       { error: 'Generation failed', details: message },

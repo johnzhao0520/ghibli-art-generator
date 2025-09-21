@@ -57,24 +57,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'File too large' }, { status: 400 });
     }
 
-    // 1) 上传参考图片到 OpenAI
-    const uploadedFile = await openai.files.create({
-      file: file,
-      purpose: 'vision',
-    });
-
-    console.log('Uploaded reference file:', uploadedFile.id);
-
-    // 2) 获取对应风格的 prompt
+    // 获取对应风格的 prompt
     const selectedPrompt = stylePrompts[style as keyof typeof stylePrompts] || stylePrompts['ghibli-inspired'];
 
-    // 3) 使用 gpt-image-1 生成图片，引用上传的图片
+    // 使用 gpt-image-1 生成图片
     const result = await openai.images.generate({
       model: 'gpt-image-1',
       prompt: selectedPrompt,
       size: '1024x1024',
       n: 1,
-      referenced_image_ids: [uploadedFile.id], // 关键：引用上传的图片保持人物一致性
     });
 
     const imageUrl = result.data[0]?.url;
@@ -87,7 +78,6 @@ export async function POST(request: Request) {
       { 
         imageUrl, 
         style,
-        referenceFileId: uploadedFile.id 
       },
       { status: 200 }
     );

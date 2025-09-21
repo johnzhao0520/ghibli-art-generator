@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
   // 权限与试用逻辑
   const isLoggedIn = !!session;
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const hasActiveSub = cookieStore.get('subscription_active')?.value === 'true';
   const hasUsedTrial = cookieStore.get('trial_used')?.value === 'true';
 

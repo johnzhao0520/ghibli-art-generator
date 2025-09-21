@@ -67,8 +67,8 @@ export async function POST(request: Request) {
     // 选择风格 prompt，允许自定义覆盖
     const selectedPrompt = customPrompt || stylePrompts[style] || stylePrompts['ghibli-inspired'];
 
-    // 使用 gpt-image-1 的 images.edits，实现“带参考图风格化”并保持人物一致性
-    const result = await openai.images.edits({
+    // 使用 gpt-image-1 的 images.edit，实现“带参考图风格化”并保持人物一致性
+    const result = await openai.images.edit({
       model: 'gpt-image-1',
       image: buffer,
       prompt: selectedPrompt,

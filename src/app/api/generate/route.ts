@@ -60,17 +60,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'File too large' }, { status: 400 });
     }
 
-    // File -> Buffer（edits 支持 Buffer/Stream）
+    // File -> Buffer -> Blob（为了符合OpenAI API的Uploadable类型）
     const arrayBuf = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuf);
+    
+    // 创建FormData并添加图像文件
+    const formData = new FormData();
+    const imageBlob = new Blob([buffer], { type: file.type });
+    formData.append('image', imageBlob, 'image.png');
+    
+    // 从FormData中获取图像文件
+    const imageFile = formData.get('image') as Blob;
 
     // 选择风格 prompt，允许自定义覆盖
     const selectedPrompt = customPrompt || stylePrompts[style] || stylePrompts['ghibli-inspired'];
 
-    // 使用 gpt-image-1 的 images.edit，实现“带参考图风格化”并保持人物一致性
+    // 使用 gpt-image-1 的 images.edit，实现"带参考图风格化"并保持人物一致性
     const result = await openai.images.edit({
       model: 'gpt-image-1',
-      image: buffer,
+      image: imageFile, // 使用Blob类型的图像文件
       prompt: selectedPrompt,
       size: '1024x1024',
       n: 1,

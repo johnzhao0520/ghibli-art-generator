@@ -85,7 +85,7 @@ export async function POST(request: Request) {
     });
 
     // 取 URL 或回退到 base64
-    const imageUrl = result.data[0]?.url || (result.data[0]?.b64_json ? `data:image/png;base64,${result.data[0]?.b64_json}` : null);
+    const imageUrl = result.data && result.data[0]?.url || (result.data && result.data[0]?.b64_json ? `data:image/png;base64,${result.data[0]?.b64_json}` : null);
     if (!imageUrl) {
       throw new Error('No image returned');
     }

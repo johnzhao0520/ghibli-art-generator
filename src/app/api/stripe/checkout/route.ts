@@ -14,8 +14,8 @@ export async function POST() {
         },
       ],
       mode: 'subscription',
-      success_url: `${process.env.NEXTAUTH_URL || process.env.VERCEL_URL || 'https://ghibli-art-generator.vercel.app'}/checkout/success/?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXTAUTH_URL || process.env.VERCEL_URL || 'https://ghibli-art-generator.vercel.app'}/checkout/cancel/`,
+      success_url: `${process.env.NEXTAUTH_URL || process.env.VERCEL_URL || 'https://ghibli-art-generator.vercel.app'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NEXTAUTH_URL || process.env.VERCEL_URL || 'https://ghibli-art-generator.vercel.app'}/checkout/cancel`,
       customer_email: undefined, // 让用户自己输入
     });
 

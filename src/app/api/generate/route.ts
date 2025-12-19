@@ -6,8 +6,16 @@ import OpenAI from 'openai';
 
 export const runtime = 'nodejs';
 
+const apiKey = process.env.OPENAI_API_KEY || process.env.ZHIPU_API_KEY;
+const baseURL = process.env.OPENAI_BASE_URL || process.env.ZHIPU_BASE_URL;
+
+if (!apiKey) {
+  throw new Error('Missing OPENAI_API_KEY or ZHIPU_API_KEY');
+}
+
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
+  apiKey,
+  baseURL,
 });
 
 // 三种吉卜力风格的 Prompt 模板（强调保持人物特征与单人构图）

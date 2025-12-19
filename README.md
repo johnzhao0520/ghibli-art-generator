@@ -27,6 +27,9 @@
 # OpenAI
 OPENAI_API_KEY=sk-...
 
+# Zhipu (GLM)
+ZHIPU_API_KEY=your-zhipu-api-key
+
 # NextAuth
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=your-secret-key
@@ -59,6 +62,25 @@ npm run build
 2. 在 Vercel 中导入项目
 3. 配置环境变量
 4. 部署
+
+## Railway 部署
+
+Railway 支持直接使用 `Dockerfile` 部署，本项目可按如下流程一键上线：
+
+1. 在 Railway 新建项目并连接 GitHub 仓库
+2. 选择 **Dockerfile** 部署（Railway 会自动检测）
+3. 在 Railway 的环境变量中配置以下值（与 `.env.production.example` 一致）：
+   - `OPENAI_API_KEY`
+   - `NEXTAUTH_URL`（Railway 提供的域名）
+   - `NEXTAUTH_SECRET`
+   - `GOOGLE_CLIENT_ID`
+   - `GOOGLE_CLIENT_SECRET`
+   - `STRIPE_SECRET_KEY`
+   - `STRIPE_PRICE_ID`
+   - `ZHIPU_API_KEY`（如需使用智谱）
+4. 点击 Deploy 完成发布
+
+> 说明：Railway 不需要 `docker-compose.yml` 或 `deploy.sh`，它们仅用于自建服务器。
 
 ## 项目结构
 
